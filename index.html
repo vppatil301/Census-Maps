@@ -1,0 +1,102 @@
+# Defining a new dataframe: Southwest Counties
+# First we define a new dataframe.  As we are using counties from Southwest, we call it SouthwestCT
+# You should notice some other differences in the code
+# The geography was changed from "county" to "tract" because we want the smaller spatial unit
+# variables, Survey, Year, Output stay the same (it will bring back same variables from same year in the same way)
+# The state="" is new and here you could define the state.  We want the Detriot MSA so its only "MI", but if you wanted to add more, you could with state=c("MI", "OH", ...)
+# The county= argument is also new.  here you can define the specific counties you would want to pull.  the c("county1name", "county2name", etc) comes from the MSA counties for 
+SouthwestCT<-get_acs(geography = "tract",  #Defining the spatial scale
+                      variables = Variables, #grabbing the variables we defined previously
+                      survey = "acs5",      # survey we are pulling is the ACS 5 year estimates
+                      year = 2020,   # End year for the 5 year estimates- 2016-2020
+                      output = "wide", # data format wide (cross sectional)
+                      state="MI", # Define which State you want to pull data from
+                      county= c("Berrien","Branch", "Cass", "Calhoun", "Kalamazoo", "St. Joseph", "Van Buren"), # Defining the counties in the state that the data will come from
+                      geometry=T) # Pulls the spatial data information with it.
+
+
+# First 10 records/observations return
+head(SouthwestCT)
+
+# summary() provides an overview of the data
+summary(SouthwestCT)
+
+view(SouthwestCT)
+
+# Lets clean up this data a little bit before we go too far
+# Here we are just pulling out the columns we care about using the indexing dataframe[,c("column name","etc")]
+Southwest<-SouthwestCT[,c("GEOID", "NAME", "MHIE", "MHVE", "TotalpopE", "geometry")]
+# Easy renaming of the variables
+names(Southwest)[names(Southwest) =="MHIE"]<-"MHI"
+names(Southwest)[names(Southwest) =="MHVE"]<-"MHV"
+names(Southwest)[names(Southwest) =="TotalpopE"]<-"Totalpop"
+
+
+### Setting up the color palettes
+SpalMHI<-colorQuantile(palette = "magma", domain=Southwest$MHI, n=10)
+SpalMHV<-colorQuantile(palette = "RdYlGn", domain=Southwest$MHV, n=10)
+Spalpop<-colorQuantile(palette = "BrBG", domain=Southwest$Totalpop, n=10)
+
+
+### The Leaflet map
+## Named map
+## this will take awhile
+SWmap<-Southwest %>% # Data set you want to map and the '%>%' is a piping command which makes it keep moving forward 
+  st_transform(crs = "+init=epsg:4326") %>% # Setting the projection of our simple feature spatial dataframe to match the webmapping application
+  leaflet() %>%  # Leaflet function which puts this all in motion
+  setView(lng = -83.06, lat = 42.33, zoom = 8)%>% # the lng and lat set the center point, while zoom chooses how zoomed in it is
+  addTiles(group = "OSM (default)") %>%  #This sets the base map and the following addProviderTiles() are optional otehr basemaps
+  addTiles(
+    urlTemplate = paste0("https://tiles.stadiamaps.com/tiles/stamen_toner_lite/{z}/{x}/{y}@2x.png?api_key=6308a316-587e-4ce8-b35d-5381a2c5c79e"),
+    attribution = '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a> contributors',
+    group = "Toner Lite"  # Group the layer for layer control
+  ) %>%
+  addProviderTiles(providers$CartoDB.Positron, group = "Carto B") %>%
+  addPolygons(group = "Total", #Add polygons is how we choose what we want to map.
+              popup = paste("Census Tract: ", Southwest$NAME, "<br>", #Pop up provides the pop up information if we were to click on the county, paste() pastes all the text together
+                            "Total Population: ", Southwest$Totalpop, "<br>", # <br> is html code for new line.   
+                            "Median Household Income: ", "$", Southwest$MHI, "<br>",
+                            "Median Home Value: ", "$", Southwest$MHV, "<br>"),
+              stroke = FALSE,
+              smoothFactor = 0,
+              fillOpacity = 0.7,
+              color = ~ Spalpop(Totalpop)) %>% #Color palette or what the color scheme is.  You made these earlier and they need to match
+  addLegend(position = "bottomleft", pal=Spalpop, values= Southwest$Totalpop, #Legend for this polygon layer
+            title="Percentile of Census Tract Total Population", group = "Total", opacity = 1) %>% 
+  addPolygons(group = "MHI", #Next layer with the same set up as before.  We could add as many as the computer would let us. 
+              popup = paste("Census Tract: ", Southwest$NAME, "<br>",
+                            "Total Population: ", Southwest$Totalpop, "<br>",
+                            "Median Household Income: ", "$", Southwest$MHI, "<br>",
+                            "Median Home Value: ", "$", Southwest$MHV, "<br>"),
+              stroke = FALSE,
+              smoothFactor = 0,
+              fillOpacity = 0.7,
+              color = ~ SpalMHI(MHI)) %>%
+  addLegend(position = "bottomright", pal=SpalMHI, values= Southwest$MHI, 
+            title="Percentile of Census Tract Median Household Income", group = "MHI", opacity = 1) %>% 
+  addPolygons(group = "MHV",
+              popup = paste("Census Tract: ", Southwest$NAME, "<br>",
+                            "Total Population: ", Southwest$Totalpop, "<br>",
+                            "Median Household Income: ", "$", Southwest$MHI, "<br>",
+                            "Median Home Value: ", "$", Southwest$MHV, "<br>"),
+              stroke = FALSE,
+              smoothFactor = 0,
+              fillOpacity = 0.7,
+              color = ~ SpalMHV(MHV)) %>%
+  addLegend(position = "bottomleft", pal=SpalMHV, values= Southwest$MHV, 
+            title="Percentile of Census Tract Median Home Value", group = "MHV", opacity = 1) %>% 
+  # Here we hide two of the groups so that only one shows on loading
+  hideGroup("MHI") %>% # Hides the MHI layer so it doesn't all pop up at load
+  hideGroup("MHV") %>% # Hides the MHV layer so it all doesn't pop up at the load
+  addLayersControl(  #Gives you the option to turn on and off different basemaps or layers.
+    baseGroups = c("OSM (default)", "Toner Lite", "Carto B"),
+    overlayGroups = c("Total", "MHI", "MHV"),
+    options = layersControlOptions(collapsed = FALSE)) 
+
+
+SWmap # loads the map you just made, this will take awhile
+
+# Saving the Html map
+# first argument is the leaflet map, second is the file name and extension, and final is whether it is selfcontained
+# The space needed for the self contained file is a lot which is why we reduced it down to just one layer.
+saveWidget(SWmap, file="SWmap.html", selfcontained = T)
