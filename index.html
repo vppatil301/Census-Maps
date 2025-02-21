@@ -1,10 +1,4 @@
-# Defining a new dataframe: Southwest Counties
-# First we define a new dataframe.  As we are using counties from Southwest, we call it SouthwestCT
-# You should notice some other differences in the code
-# The geography was changed from "county" to "tract" because we want the smaller spatial unit
-# variables, Survey, Year, Output stay the same (it will bring back same variables from same year in the same way)
-# The state="" is new and here you could define the state.  We want the Detriot MSA so its only "MI", but if you wanted to add more, you could with state=c("MI", "OH", ...)
-# The county= argument is also new.  here you can define the specific counties you would want to pull.  the c("county1name", "county2name", etc) comes from the MSA counties for 
+
 SouthwestCT<-get_acs(geography = "tract",  #Defining the spatial scale
                       variables = Variables, #grabbing the variables we defined previously
                       survey = "acs5",      # survey we are pulling is the ACS 5 year estimates
@@ -15,32 +9,22 @@ SouthwestCT<-get_acs(geography = "tract",  #Defining the spatial scale
                       geometry=T) # Pulls the spatial data information with it.
 
 
-# First 10 records/observations return
 head(SouthwestCT)
 
-# summary() provides an overview of the data
 summary(SouthwestCT)
 
 view(SouthwestCT)
 
-# Lets clean up this data a little bit before we go too far
-# Here we are just pulling out the columns we care about using the indexing dataframe[,c("column name","etc")]
 Southwest<-SouthwestCT[,c("GEOID", "NAME", "MHIE", "MHVE", "TotalpopE", "geometry")]
-# Easy renaming of the variables
+
 names(Southwest)[names(Southwest) =="MHIE"]<-"MHI"
 names(Southwest)[names(Southwest) =="MHVE"]<-"MHV"
 names(Southwest)[names(Southwest) =="TotalpopE"]<-"Totalpop"
 
-
-### Setting up the color palettes
 SpalMHI<-colorQuantile(palette = "magma", domain=Southwest$MHI, n=10)
 SpalMHV<-colorQuantile(palette = "RdYlGn", domain=Southwest$MHV, n=10)
 Spalpop<-colorQuantile(palette = "BrBG", domain=Southwest$Totalpop, n=10)
 
-
-### The Leaflet map
-## Named map
-## this will take awhile
 SWmap<-Southwest %>% # Data set you want to map and the '%>%' is a piping command which makes it keep moving forward 
   st_transform(crs = "+init=epsg:4326") %>% # Setting the projection of our simple feature spatial dataframe to match the webmapping application
   leaflet() %>%  # Leaflet function which puts this all in motion
@@ -93,10 +77,6 @@ SWmap<-Southwest %>% # Data set you want to map and the '%>%' is a piping comman
     overlayGroups = c("Total", "MHI", "MHV"),
     options = layersControlOptions(collapsed = FALSE)) 
 
+SWmap 
 
-SWmap # loads the map you just made, this will take awhile
-
-# Saving the Html map
-# first argument is the leaflet map, second is the file name and extension, and final is whether it is selfcontained
-# The space needed for the self contained file is a lot which is why we reduced it down to just one layer.
 saveWidget(SWmap, file="SWmap.html", selfcontained = T)
