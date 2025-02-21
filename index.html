@@ -1,3 +1,29 @@
+census_api_key("12b80ea1ddcb138b84c3a2f525661786a48a7998")
+
+ACS<-load_variables(2020,
+                    "acs5",
+                    cache=FALSE)
+  
+Variables<-c(MHI = "B19013_001", # Median Household Income
+             MHV = "B25077_001", # Median Home Value
+             Totalpop = "B01003_001") # Total Population
+
+head(County)
+summary(County)
+view(County)
+
+County<-get_acs(geography = "county",  #Defining the spatial scale
+                variables = Variables, #grabbing the variables we defined previously
+                survey = "acs5",      # survey we are pulling is the ACS 5 year estimates
+                year = 2020,   # End year for the 5 year estimates- 2016-2020
+                output = "wide", # data format wide (cross sectional)
+                geometry=T) # Pulls the spatial data information with it.
+
+Counties<-County[,c("GEOID", "NAME", "MHIE", "MHVE", "TotalpopE", "geometry")]
+  
+names(Counties)[names(Counties) =="MHIE"]<-"MHI"
+names(Counties)[names(Counties) =="MHVE"]<-"MHV"
+names(Counties)[names(Counties) =="TotalpopE"]<-"Totalpop"  
 
 SouthwestCT<-get_acs(geography = "tract",  #Defining the spatial scale
                       variables = Variables, #grabbing the variables we defined previously
